@@ -60,7 +60,7 @@ python etl/load_structured.py                     # patients, prices, budgets, i
 
 - [x] Schema + seed-question views
 - [x] ETL for the structured sources (patients, LK prices, budgets, invoices)
-- [x] Tours/visits loader — 27 Apr–24 May loaded; early-April (1–26) re-parse pending
+- [x] Tours/visits loader — FULL Apr 1–May 24 loaded (8,884 visits); parser in etl/parser/
 - [ ] Natural-language (text-to-SQL) query layer
 - [ ] pgvector RAG over Verordnungen / care-plan PDFs
 - [ ] `authorizations` (extracted from Muster 12 / HKP) → "authorised vs serviced"

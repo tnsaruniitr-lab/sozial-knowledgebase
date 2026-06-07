@@ -29,7 +29,8 @@ def num(x):
 def main():
     if not DB:
         sys.exit("set DATABASE_URL")
-    rows = list(csv.DictReader(open(os.path.join(DATA, "tours.csv"))))
+    src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(DATA, "tours.csv")
+    rows = list(csv.DictReader(open(src)))
     c = psycopg2.connect(DB); cur = c.cursor()
     cur.execute("select alias_norm, patient_id from patient_aliases")
     amap = dict(cur.fetchall())

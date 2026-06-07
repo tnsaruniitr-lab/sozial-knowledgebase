@@ -17,28 +17,39 @@ from latest l join patients p using (patient_id)
 where l.budget_eur > 0
 order by l.budget_eur desc;
 
--- Q2: "Tour efficiency" — care vs travel minutes per tour.
+-- Q2: "Tour efficiency" — care vs travel per tour.
+-- NB: travel_minutes is the tour TOTAL repeated on every visit row, so use
+-- max() (one value per tour), not sum(); care is per-visit so sum() is right.
 create or replace view v_tour_efficiency as
 select t.tour_id, t.date, n.name as nurse,
        sum(v.service_minutes) as care_min,
-       sum(v.travel_minutes)  as travel_min,
+       max(v.travel_minutes)  as travel_min,
        round(100.0 * sum(v.service_minutes)
-             / nullif(sum(v.service_minutes) + sum(v.travel_minutes), 0), 1) as care_pct
+             / nullif(sum(v.service_minutes) + max(v.travel_minutes), 0), 1) as care_pct
 from tours t
 join visits v using (tour_id)
 left join nurses n using (nurse_id)
 group by t.tour_id, t.date, n.name;
 
 -- Q3: "Per-customer P&L / loss-makers" — billed revenue vs care+travel cost.
+-- Travel is a tour total (repeated per row), so allocate each visit an equal
+-- share = tour_travel / visits_in_tour, then sum per patient. (Marginal-detour
+-- attribution is a later refinement.)
 create or replace view v_customer_pnl as
 with rev as (
   select patient_id, service_month, sum(amount_eur) as revenue
   from invoices group by patient_id, service_month
 ),
+tour_travel as (
+  select tour_id, max(travel_minutes) as t_travel, count(*) as n
+  from visits group by tour_id
+),
 cost as (
-  select patient_id, to_char(date, 'YYYY-MM') as month,
-         round(sum(coalesce(service_minutes,0) + coalesce(travel_minutes,0)) / 60.0 * 40, 2) as cost
-  from visits group by patient_id, to_char(date, 'YYYY-MM')
+  select v.patient_id, to_char(v.date, 'YYYY-MM') as month,
+         round(sum(coalesce(v.service_minutes,0)
+                   + coalesce(tt.t_travel,0) / nullif(tt.n,0)) / 60.0 * 40, 2) as cost
+  from visits v join tour_travel tt using (tour_id)
+  group by v.patient_id, to_char(v.date, 'YYYY-MM')
 )
 select p.full_name, r.service_month, r.revenue, coalesce(c.cost, 0) as cost,
        round(r.revenue - coalesce(c.cost, 0), 2) as profit

@@ -41,6 +41,13 @@ tr:last-child td{border-bottom:0}
   <div class="sub">Live aus der Datenbank (Frankfurt) · April–Mai 2026</div>
 </header>
 <main>
+  <div class="q" style="border:2px solid var(--ac)">
+    <h2>🔎 Frage in eigenen Worten (KI)</h2>
+    <p>Natürliche Sprache → SQL → Ergebnis. z. B. „welche Pflegekraft war im Mai am wenigsten ausgelastet" · „Patienten mit über €2000 ungenutztem §45".</p>
+    <div class="row"><input id="askq" placeholder="Frage eingeben…" style="flex:1;min-width:320px"
+      onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Fragen</button></div>
+    <div id="askout"></div>
+  </div>
   <div class="q">
     <h2>a) Am wenigsten ausgelastete Touren (April)</h2>
     <p>Niedrigste Pflege-Auslastung (Pflege ÷ Pflege+Fahrt/Leerlauf) — wo wir viel fahren für wenig Pflege.</p>
@@ -112,6 +119,19 @@ function qC(){const n=document.getElementById('pat').value.trim()||'Joppien';run
     table(d,[{k:'paragraph',h:'§',f:v=>'§'+v},{k:'budget_eur',h:'Budget €'},{k:'used_eur',h:'verbraucht €'},
       {k:'remaining_eur',h:'verfügbar €'},{k:'util_pct',h:'genutzt',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
 });}
+async function ask(){
+  const q=document.getElementById('askq').value.trim(); if(!q)return;
+  const el=document.getElementById('askout'); el.innerHTML='<span class="muted">denke nach…</span>';
+  try{
+    const r=await fetch('/ask',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q})});
+    const d=await r.json();
+    if(d.error){ el.innerHTML='<span class="bad">'+esc(d.error)+'</span>'+(d.sql?'<div class="muted" style="margin-top:6px"><code>'+esc(d.sql)+'</code></div>':''); return; }
+    const cols=d.columns||[];
+    el.innerHTML=(d.rows.length?'<table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+
+      d.rows.map(row=>'<tr>'+cols.map(c=>'<td>'+esc(row[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table>':'<p class="muted">Keine Treffer.</p>')+
+      '<div class="muted" style="margin-top:6px">SQL: <code>'+esc(d.sql)+'</code></div>';
+  }catch(e){ el.innerHTML='<span class="bad">Fehler: '+esc(e.message)+'</span>'; }
+}
 function qD(){const t=+document.getElementById('thr').value||20;run('outD',async()=>{
   const d=await api("v_budget_utilisation?util_pct=lt."+t+"&order=remaining_eur.desc&limit=40");
   return '<p class="muted">'+d.length+' Treffer (genutzt &lt; '+t+'%)</p>'+

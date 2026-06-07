@@ -62,6 +62,6 @@ python etl/load_structured.py                     # patients, prices, budgets, i
 - [x] ETL for the structured sources (patients, LK prices, budgets, invoices)
 - [x] Tours/visits loader — FULL Apr 1–May 24 loaded (8,884 visits); parser in etl/parser/
 - [x] Tier-1 query app (app/index.html) — 4 canned questions, live from Supabase
-- [ ] Natural-language (text-to-SQL) query layer
+- [x] Natural-language ask box + backend (app/server.py) — NL→SQL→read-only; needs LLM_API_KEY to activate
 - [ ] pgvector RAG over Verordnungen / care-plan PDFs
 - [ ] `authorizations` (extracted from Muster 12 / HKP) → "authorised vs serviced"

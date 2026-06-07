@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sozialstation — Wissensabfrage</title>
+<style>
+:root{--bg:#0f1226;--card:#fff;--ink:#1d2330;--mut:#6b7280;--ln:#e5e7eb;--ac:#3b5bdb}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f5f8;color:var(--ink)}
+header{background:#141a3a;color:#fff;padding:14px 22px}
+header h1{margin:0;font-size:18px}
+header .sub{color:#aab;font-size:12.5px;margin-top:2px}
+main{max-width:1000px;margin:0 auto;padding:18px 16px 60px}
+.q{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.q h2{margin:0 0 4px;font-size:15.5px}
+.q p{margin:0 0 10px;color:var(--mut);font-size:12.5px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+input{padding:9px 11px;border:1px solid var(--ln);border-radius:8px;font-size:14px;min-width:200px}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer}
+button:hover{background:#2f49b8}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--ln)}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--mut);background:#fafbfc}
+tr:last-child td{border-bottom:0}
+.kpi{display:inline-block;background:#eef2ff;border-radius:8px;padding:6px 12px;margin:2px 6px 2px 0;font-weight:600}
+.bad{color:#c0392b;font-weight:700}.warn{color:#b26a00;font-weight:600}.ok{color:#1a7f37;font-weight:600}
+.muted{color:var(--mut)}
+#gate{position:fixed;inset:0;background:#141a3a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;z-index:50}
+.err{color:#ff9a9a;font-size:13px;min-height:16px}
+.note{font-size:11.5px;color:var(--mut);margin-top:8px}
+</style></head>
+<body>
+<div id="gate">
+  <h1 style="margin:0">Sozialstation — Wissensabfrage</h1>
+  <div>Bitte Passwort eingeben</div>
+  <input id="pw" type="password" placeholder="Passwort" autofocus>
+  <button onclick="checkpw()">Anmelden</button>
+  <div class="err" id="pwerr"></div>
+</div>
+
+<header>
+  <h1>Sozialstation — Wissensabfrage</h1>
+  <div class="sub">Live aus der Datenbank (Frankfurt) · April–Mai 2026</div>
+</header>
+<main>
+  <div class="q">
+    <h2>a) Am wenigsten ausgelastete Touren (April)</h2>
+    <p>Niedrigste Pflege-Auslastung (Pflege ÷ Pflege+Fahrt/Leerlauf) — wo wir viel fahren für wenig Pflege.</p>
+    <div class="row"><button onclick="qA()">Anzeigen</button></div>
+    <div id="outA"></div>
+  </div>
+  <div class="q">
+    <h2>b) Touren-Effizienz für Pflegekraft X (April)</h2>
+    <p>Pro Tag + Durchschnitt für eine Pflegekraft.</p>
+    <div class="row"><input id="nurse" placeholder="z. B. Blank"><button onclick="qB()">Anzeigen</button></div>
+    <div id="outB"></div>
+  </div>
+  <div class="q">
+    <h2>c) Budget-Auslastung §36/§39/§45 für Patient X</h2>
+    <p>Verbraucht vs. verfügbar je Topf.</p>
+    <div class="row"><input id="pat" placeholder="z. B. Joppien"><button onclick="qC()">Anzeigen</button></div>
+    <div id="outC"></div>
+  </div>
+  <div class="q">
+    <h2>d) Patienten mit gering genutztem SGB-Budget</h2>
+    <p>Wo Budget ungenutzt liegt (Auslastung unter Schwelle).</p>
+    <div class="row">unter <input id="thr" type="number" value="20" style="min-width:80px">% genutzt
+      <button onclick="qD()">Anzeigen</button></div>
+    <div id="outD"></div>
+  </div>
+  <p class="note">POC · liest Sichten live über den Publishable-Key. Im Betrieb: hinter Login + read-only-Rolle.</p>
+</main>
+
+<script>
+const URL="https://tfxgheowowqjsbaahnie.supabase.co";
+const KEY="sb_publishable_798xI9HxowBG7VuYEpf6ug_zhmtISG0";
+const PW="sozial2026";
+function checkpw(){ if(document.getElementById('pw').value===PW){sessionStorage.kb='1';document.getElementById('gate').style.display='none';} else {document.getElementById('pwerr').textContent='Falsches Passwort';} }
+if(sessionStorage.kb==='1') document.getElementById('gate').style.display='none';
+document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')checkpw();});
+
+async function api(path){
+  const r=await fetch(URL+"/rest/v1/"+path,{headers:{apikey:KEY,Authorization:"Bearer "+KEY}});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function table(rows,cols){
+  if(!rows.length) return '<p class="muted">Keine Treffer.</p>';
+  return '<table><thead><tr>'+cols.map(c=>'<th>'+c.h+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map(r=>'<tr>'+cols.map(c=>'<td>'+(c.f?c.f(r[c.k],r):esc(r[c.k]))+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+}
+const utilCls=v=>v<40?'bad':v<60?'warn':'ok';
+async function run(id,fn){const el=document.getElementById(id);el.innerHTML='<span class="muted">lädt…</span>';try{el.innerHTML=await fn();}catch(e){el.innerHTML='<span class="bad">Fehler: '+esc(e.message).slice(0,200)+'</span>';}}
+
+function qA(){run('outA',async()=>{
+  const d=await api("v_utilisation?month=eq.2026-04&order=care_util.asc&limit=12&select=nurse,date,care_min,travel_min,care_util");
+  return table(d,[{k:'nurse',h:'Pflegekraft'},{k:'date',h:'Datum'},
+    {k:'care_min',h:'Pflege min'},{k:'travel_min',h:'Fahrt/Leerlauf min'},
+    {k:'care_util',h:'Pflege-Auslastung',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+});}
+function qB(){const n=document.getElementById('nurse').value.trim()||'Blank';run('outB',async()=>{
+  const d=await api("v_utilisation?month=eq.2026-04&nurse=ilike.*"+encodeURIComponent(n)+"*&order=date.asc&select=date,nurse,care_min,travel_min,care_util");
+  if(!d.length) return '<p class="muted">Keine Treffer für "'+esc(n)+'".</p>';
+  const avg=(d.reduce((s,r)=>s+(+r.care_util||0),0)/d.length).toFixed(1);
+  return '<div><span class="kpi">'+esc(d[0].nurse)+'</span><span class="kpi">Ø Pflege-Auslastung '+avg+'%</span><span class="kpi">'+d.length+' Touren</span></div>'+
+    table(d,[{k:'date',h:'Datum'},{k:'care_min',h:'Pflege min'},{k:'travel_min',h:'Fahrt/Leerlauf'},
+      {k:'care_util',h:'Auslastung',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+});}
+function qC(){const n=document.getElementById('pat').value.trim()||'Joppien';run('outC',async()=>{
+  const d=await api("v_budget_utilisation?full_name=ilike.*"+encodeURIComponent(n)+"*&order=paragraph.asc");
+  if(!d.length) return '<p class="muted">Keine Treffer für "'+esc(n)+'".</p>';
+  return '<div class="kpi">'+esc(d[0].full_name)+'</div>'+
+    table(d,[{k:'paragraph',h:'§',f:v=>'§'+v},{k:'budget_eur',h:'Budget €'},{k:'used_eur',h:'verbraucht €'},
+      {k:'remaining_eur',h:'verfügbar €'},{k:'util_pct',h:'genutzt',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+});}
+function qD(){const t=+document.getElementById('thr').value||20;run('outD',async()=>{
+  const d=await api("v_budget_utilisation?util_pct=lt."+t+"&order=remaining_eur.desc&limit=40");
+  return '<p class="muted">'+d.length+' Treffer (genutzt &lt; '+t+'%)</p>'+
+    table(d,[{k:'full_name',h:'Patient'},{k:'paragraph',h:'§',f:v=>'§'+v},
+      {k:'remaining_eur',h:'ungenutzt €'},{k:'util_pct',h:'genutzt',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+});}
+</script>
+</body></html>

@@ -1,0 +1,27 @@
+# ---- SECRETS — never commit ----
+.env
+.env.*
+*.pem
+**/connection-string*
+
+# ---- PATIENT DATA (PII / GDPR Art. 9) — never commit ----
+etl/data/*
+!etl/data/.gitkeep
+*.xls
+*.XLS
+*.xlsx
+*.csv
+*.rps
+*.pdf
+# (the source files live locally only)
+
+# ---- Python ----
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ---- misc ----
+.DS_Store
+node_modules/
+dist/

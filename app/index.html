@@ -42,7 +42,7 @@ tr:last-child td{border-bottom:0}
 </header>
 <main>
   <div class="q" style="border:2px solid var(--ac)">
-    <h2>🔎 Frage in eigenen Worten (KI)</h2>
+    <h2>🔎 Frage in eigenen Worten (KI) <span id="engst" class="note" style="float:right;font-weight:600"></span></h2>
     <p>Natürliche Sprache → SQL → Ergebnis. z. B. „welche Pflegekraft war im Mai am wenigsten ausgelastet" · „Patienten mit über €2000 ungenutztem §45".</p>
     <div class="row"><input id="askq" placeholder="Frage eingeben…" style="flex:1;min-width:320px"
       onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Fragen</button></div>
@@ -119,6 +119,14 @@ function qC(){const n=document.getElementById('pat').value.trim()||'Joppien';run
     table(d,[{k:'paragraph',h:'§',f:v=>'§'+v},{k:'budget_eur',h:'Budget €'},{k:'used_eur',h:'verbraucht €'},
       {k:'remaining_eur',h:'verfügbar €'},{k:'util_pct',h:'genutzt',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
 });}
+async function engStatus(){
+  try{const r=await fetch('/engine');const d=await r.json();
+    const el=document.getElementById('engst');
+    el.textContent = d.has_key?'🟢 API aktiv':d.live?'🟢 Live-Engine verbunden':'⚪ Engine offline';
+    el.style.color = (d.has_key||d.live)?'#1a7f37':'#6b7280';
+  }catch(e){}
+}
+engStatus(); setInterval(engStatus,5000);
 async function ask(){
   const q=document.getElementById('askq').value.trim(); if(!q)return;
   const el=document.getElementById('askout'); el.innerHTML='<span class="muted">denke nach…</span>';

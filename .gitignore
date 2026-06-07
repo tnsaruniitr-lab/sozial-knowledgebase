@@ -21,6 +21,13 @@ __pycache__/
 .venv/
 venv/
 
+# ---- bridge runtime (live in-session NL->SQL queue) ----
+app/bridge/q/
+app/bridge/a/
+app/bridge/ENGINE
+*.seen
+*.tmp
+
 # ---- misc ----
 .DS_Store
 node_modules/

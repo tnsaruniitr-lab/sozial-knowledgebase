@@ -5,7 +5,7 @@ only, executed in a READ ONLY transaction with a statement timeout + auto LIMIT.
 Provider/key from env (LLM_PROVIDER=anthropic|openai, LLM_API_KEY=...); if unset,
 /ask returns a clear 'not configured' message so the UI still runs.
 """
-import os, re, json, urllib.request
+import os, re, json, time, uuid, pathlib, urllib.request
 from flask import Flask, request, jsonify, send_from_directory
 import psycopg2
 
@@ -14,7 +14,42 @@ PROVIDER = os.environ.get("LLM_PROVIDER", "anthropic").lower()
 KEY = os.environ.get("LLM_API_KEY", "")
 MODEL = os.environ.get("LLM_MODEL", "claude-3-5-sonnet-20241022" if PROVIDER == "anthropic" else "gpt-4o")
 HERE = os.path.dirname(__file__)
+BRIDGE = pathlib.Path(HERE) / "bridge"          # live in-session NL->SQL queue
+ENGINE = BRIDGE / "ENGINE"                       # heartbeat touched by the Monitor loop
 app = Flask(__name__, static_folder=HERE, static_url_path="")
+
+
+def bridge_live():
+    """True when the in-chat Claude loop is attached (heartbeat < 12s old)."""
+    try:
+        return (time.time() - ENGINE.stat().st_mtime) < 12
+    except OSError:
+        return False
+
+
+def ask_via_bridge(question):
+    """Hand the question to the in-session Claude via the file queue and wait
+    for the answer it writes. No API key needed — full Claude quality, local."""
+    qid = uuid.uuid4().hex[:12]
+    (BRIDGE / "q").mkdir(parents=True, exist_ok=True)
+    (BRIDGE / "a").mkdir(parents=True, exist_ok=True)
+    (BRIDGE / "q" / f"{qid}.json").write_text(
+        json.dumps({"id": qid, "question": question, "ts": time.time()}, ensure_ascii=False))
+    ans = BRIDGE / "a" / f"{qid}.json"
+    deadline = time.time() + 150
+    while time.time() < deadline:
+        if ans.exists():
+            d = json.loads(ans.read_text())
+            for p in (BRIDGE / "q" / f"{qid}.json", BRIDGE / "q" / f"{qid}.seen", ans):
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
+            if d.get("error"):
+                return jsonify(error=d["error"], sql=d.get("sql", "")), 200
+            return jsonify(sql=d.get("sql", ""), columns=d.get("columns", []), rows=d.get("rows", []))
+        time.sleep(0.4)
+    return jsonify(error="Zeitüberschreitung — die Live-Engine (Claude-Sitzung) hat nicht geantwortet."), 200
 
 SCHEMA_CARD = """You write ONE PostgreSQL SELECT for a home-care (Pflegedienst) database.
 Prefer these VIEWS:
@@ -99,7 +134,10 @@ def ask():
     if not q:
         return jsonify(error="Bitte Frage eingeben."), 400
     if not KEY:
-        return jsonify(error="Kein LLM-Schlüssel konfiguriert (LLM_API_KEY). Frage-Box ist bereit — Schlüssel setzen zum Aktivieren."), 503
+        # No API key: use the live in-session engine if the Claude loop is attached.
+        if bridge_live():
+            return ask_via_bridge(q)
+        return jsonify(error="Keine Engine verbunden. Entweder LLM_API_KEY setzen, oder die Claude-Sitzung-Schleife starten (Live-Engine)."), 503
     try:
         sql = clean_sql(ask_llm(q))
         if not safe(sql):
@@ -110,5 +148,11 @@ def ask():
         return jsonify(error=str(e)[:300]), 500
 
 
+@app.route("/engine")
+def engine():
+    """Frontend polls this to show whether the live engine is attached."""
+    return jsonify(live=bridge_live(), has_key=bool(KEY))
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 4400)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 4400)), threaded=True)

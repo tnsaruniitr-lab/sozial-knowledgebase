@@ -5,7 +5,7 @@
 :root{--bg:#0f1226;--card:#fff;--ink:#1d2330;--mut:#6b7280;--ln:#e5e7eb;--ac:#3b5bdb}
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f4f5f8;color:var(--ink)}
-header{background:#141a3a;color:#fff;padding:14px 22px}
+header{background:#141a3a;color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 header h1{margin:0;font-size:18px}
 header .sub{color:#aab;font-size:12.5px;margin-top:2px}
 main{max-width:1000px;margin:0 auto;padding:18px 16px 60px}
@@ -26,61 +26,148 @@ tr:last-child td{border-bottom:0}
 #gate{position:fixed;inset:0;background:#141a3a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;z-index:50}
 .err{color:#ff9a9a;font-size:13px;min-height:16px}
 .note{font-size:11.5px;color:var(--mut);margin-top:8px}
+.langwrap{display:flex;gap:6px;align-items:center}
+.lang{background:transparent;border:1px solid #3a4170;color:#cdd3f0;padding:4px 10px;font-size:12px;border-radius:6px;font-weight:700}
+.lang:hover{background:#222a52}
+.lang.on{background:var(--ac);border-color:var(--ac);color:#fff}
 </style></head>
 <body>
 <div id="gate">
-  <h1 style="margin:0">Sozialstation — Wissensabfrage</h1>
-  <div>Bitte Passwort eingeben</div>
-  <input id="pw" type="password" placeholder="Passwort" autofocus>
-  <button onclick="checkpw()">Anmelden</button>
+  <div class="langwrap" style="position:absolute;top:14px;right:16px">
+    <button class="lang" data-l="de" onclick="setLang('de')">DE</button>
+    <button class="lang" data-l="en" onclick="setLang('en')">EN</button>
+  </div>
+  <h1 style="margin:0" data-i18n="title">Sozialstation — Wissensabfrage</h1>
+  <div data-i18n="gate_prompt">Bitte Passwort eingeben</div>
+  <input id="pw" type="password" data-i18n-ph="pw_ph" placeholder="Passwort" autofocus>
+  <button onclick="checkpw()" data-i18n="login">Anmelden</button>
   <div class="err" id="pwerr"></div>
 </div>
 
 <header>
-  <h1>Sozialstation — Wissensabfrage</h1>
-  <div class="sub">Live aus der Datenbank (Frankfurt) · April–Mai 2026</div>
+  <div>
+    <h1 data-i18n="title">Sozialstation — Wissensabfrage</h1>
+    <div class="sub" data-i18n="sub">Live aus der Datenbank (Frankfurt) · April–Mai 2026</div>
+  </div>
+  <div class="langwrap">
+    <button class="lang" data-l="de" onclick="setLang('de')">DE</button>
+    <button class="lang" data-l="en" onclick="setLang('en')">EN</button>
+  </div>
 </header>
 <main>
   <div class="q" style="border:2px solid var(--ac)">
-    <h2>🔎 Frage in eigenen Worten (KI) <span id="engst" class="note" style="float:right;font-weight:600"></span></h2>
-    <p>Natürliche Sprache → SQL → Ergebnis. z. B. „welche Pflegekraft war im Mai am wenigsten ausgelastet" · „Patienten mit über €2000 ungenutztem §45".</p>
-    <div class="row"><input id="askq" placeholder="Frage eingeben…" style="flex:1;min-width:320px"
-      onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Fragen</button></div>
+    <h2><span data-i18n="ask_h">🔎 Frage in eigenen Worten (KI)</span> <span id="engst" class="note" style="float:right;font-weight:600"></span></h2>
+    <p data-i18n="ask_p">Natürliche Sprache → SQL → Ergebnis.</p>
+    <div class="row"><input id="askq" data-i18n-ph="ask_ph" placeholder="Frage eingeben…" style="flex:1;min-width:320px"
+      onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()" data-i18n="ask_btn">Fragen</button></div>
     <div id="askout"></div>
   </div>
   <div class="q">
-    <h2>a) Am wenigsten ausgelastete Touren (April)</h2>
-    <p>Niedrigste Pflege-Auslastung (Pflege ÷ Pflege+Fahrt/Leerlauf) — wo wir viel fahren für wenig Pflege.</p>
-    <div class="row"><button onclick="qA()">Anzeigen</button></div>
+    <h2 data-i18n="qa_h">a) Am wenigsten ausgelastete Touren (April)</h2>
+    <p data-i18n="qa_p">Niedrigste Pflege-Auslastung.</p>
+    <div class="row"><button onclick="qA()" data-i18n="show">Anzeigen</button></div>
     <div id="outA"></div>
   </div>
   <div class="q">
-    <h2>b) Touren-Effizienz für Pflegekraft X (April)</h2>
-    <p>Pro Tag + Durchschnitt für eine Pflegekraft.</p>
-    <div class="row"><input id="nurse" placeholder="z. B. Blank"><button onclick="qB()">Anzeigen</button></div>
+    <h2 data-i18n="qb_h">b) Touren-Effizienz für Pflegekraft X (April)</h2>
+    <p data-i18n="qb_p">Pro Tag + Durchschnitt für eine Pflegekraft.</p>
+    <div class="row"><input id="nurse" data-i18n-ph="nurse_ph" placeholder="z. B. Blank"><button onclick="qB()" data-i18n="show">Anzeigen</button></div>
     <div id="outB"></div>
   </div>
   <div class="q">
-    <h2>c) Budget-Auslastung §36/§39/§45 für Patient X</h2>
-    <p>Verbraucht vs. verfügbar je Topf.</p>
-    <div class="row"><input id="pat" placeholder="z. B. Joppien"><button onclick="qC()">Anzeigen</button></div>
+    <h2 data-i18n="qc_h">c) Budget-Auslastung §36/§39/§45 für Patient X</h2>
+    <p data-i18n="qc_p">Verbraucht vs. verfügbar je Topf.</p>
+    <div class="row"><input id="pat" data-i18n-ph="pat_ph" placeholder="z. B. Joppien"><button onclick="qC()" data-i18n="show">Anzeigen</button></div>
     <div id="outC"></div>
   </div>
   <div class="q">
-    <h2>d) Patienten mit gering genutztem SGB-Budget</h2>
-    <p>Wo Budget ungenutzt liegt (Auslastung unter Schwelle).</p>
-    <div class="row">unter <input id="thr" type="number" value="20" style="min-width:80px">% genutzt
-      <button onclick="qD()">Anzeigen</button></div>
+    <h2 data-i18n="qd_h">d) Patienten mit gering genutztem SGB-Budget</h2>
+    <p data-i18n="qd_p">Wo Budget ungenutzt liegt.</p>
+    <div class="row"><span data-i18n="qd_under">unter</span> <input id="thr" type="number" value="20" style="min-width:80px"><span data-i18n="qd_usedpct">% genutzt</span>
+      <button onclick="qD()" data-i18n="show">Anzeigen</button></div>
     <div id="outD"></div>
   </div>
-  <p class="note">POC · liest Sichten live über den Publishable-Key. Im Betrieb: hinter Login + read-only-Rolle.</p>
+  <p class="note" data-i18n="note">POC · liest Sichten live über den Publishable-Key. Im Betrieb: hinter Login + read-only-Rolle.</p>
 </main>
 
 <script>
 const URL="https://tfxgheowowqjsbaahnie.supabase.co";
 const KEY="sb_publishable_798xI9HxowBG7VuYEpf6ug_zhmtISG0";
 const PW="sozial2026";
-function checkpw(){ if(document.getElementById('pw').value===PW){sessionStorage.kb='1';document.getElementById('gate').style.display='none';} else {document.getElementById('pwerr').textContent='Falsches Passwort';} }
+
+const I18N={
+ de:{
+  title:'Sozialstation — Wissensabfrage',
+  sub:'Live aus der Datenbank (Frankfurt) · April–Mai 2026',
+  gate_prompt:'Bitte Passwort eingeben', pw_ph:'Passwort', login:'Anmelden', pw_wrong:'Falsches Passwort',
+  ask_h:'🔎 Frage in eigenen Worten (KI)',
+  ask_p:'Natürliche Sprache → SQL → Ergebnis. z. B. „welche Pflegekraft war im Mai am wenigsten ausgelastet" · „Patienten mit über €2000 ungenutztem §45".',
+  ask_ph:'Frage eingeben…', ask_btn:'Fragen',
+  qa_h:'a) Am wenigsten ausgelastete Touren (April)',
+  qa_p:'Niedrigste Pflege-Auslastung (Pflege ÷ Pflege+Fahrt/Leerlauf) — wo wir viel fahren für wenig Pflege.',
+  show:'Anzeigen',
+  qb_h:'b) Touren-Effizienz für Pflegekraft X (April)',
+  qb_p:'Pro Tag + Durchschnitt für eine Pflegekraft.', nurse_ph:'z. B. Blank',
+  qc_h:'c) Budget-Auslastung §36/§39/§45 für Patient X',
+  qc_p:'Verbraucht vs. verfügbar je Topf.', pat_ph:'z. B. Joppien',
+  qd_h:'d) Patienten mit gering genutztem SGB-Budget',
+  qd_p:'Wo Budget ungenutzt liegt (Auslastung unter Schwelle).',
+  qd_under:'unter', qd_usedpct:'% genutzt',
+  note:'POC · liest Sichten live über den Publishable-Key. Im Betrieb: hinter Login + read-only-Rolle.',
+  loading:'lädt…', thinking:'denke nach…', error:'Fehler: ', no_hits:'Keine Treffer.',
+  no_hits_for:'Keine Treffer für "%s".',
+  eng_api:'🟢 API aktiv', eng_live:'🟢 Live-Engine verbunden', eng_off:'⚪ Engine offline',
+  h_nurse:'Pflegekraft', h_date:'Datum', h_caremin:'Pflege min', h_travelmin_full:'Fahrt/Leerlauf min',
+  h_travelmin:'Fahrt/Leerlauf', h_careutil:'Pflege-Auslastung', h_util:'Auslastung',
+  h_budget:'Budget €', h_used:'verbraucht €', h_remaining:'verfügbar €', h_usedpct:'genutzt',
+  h_patient:'Patient', h_unused:'ungenutzt €',
+  kpi_avg:'Ø Pflege-Auslastung %s%', kpi_tours:'%s Touren',
+  qd_count:'%c Treffer (genutzt &lt; %t%)'
+ },
+ en:{
+  title:'Sozialstation — Knowledge Query',
+  sub:'Live from the database (Frankfurt) · April–May 2026',
+  gate_prompt:'Please enter password', pw_ph:'Password', login:'Sign in', pw_wrong:'Wrong password',
+  ask_h:'🔎 Ask in your own words (AI)',
+  ask_p:'Natural language → SQL → result. e.g. "which nurse was least utilised in May" · "patients with over €2000 unused §45".',
+  ask_ph:'Enter a question…', ask_btn:'Ask',
+  qa_h:'a) Least-utilised tours (April)',
+  qa_p:'Lowest care-utilisation (care ÷ care+travel/idle) — where we travel a lot for little care.',
+  show:'Show',
+  qb_h:'b) Tour efficiency for nurse X (April)',
+  qb_p:'Per day + average for one nurse.', nurse_ph:'e.g. Blank',
+  qc_h:'c) Budget utilisation §36/§39/§45 for patient X',
+  qc_p:'Used vs. available per pot.', pat_ph:'e.g. Joppien',
+  qd_h:'d) Patients with under-used SGB budget',
+  qd_p:'Where budget sits unused (utilisation below threshold).',
+  qd_under:'below', qd_usedpct:'% used',
+  note:'POC · reads views live via the publishable key. In production: behind login + read-only role.',
+  loading:'loading…', thinking:'thinking…', error:'Error: ', no_hits:'No results.',
+  no_hits_for:'No results for "%s".',
+  eng_api:'🟢 API active', eng_live:'🟢 Live engine connected', eng_off:'⚪ Engine offline',
+  h_nurse:'Nurse', h_date:'Date', h_caremin:'Care min', h_travelmin_full:'Travel/idle min',
+  h_travelmin:'Travel/idle', h_careutil:'Care utilisation', h_util:'Utilisation',
+  h_budget:'Budget €', h_used:'used €', h_remaining:'available €', h_usedpct:'used',
+  h_patient:'Patient', h_unused:'unused €',
+  kpi_avg:'Avg care util. %s%', kpi_tours:'%s tours',
+  qd_count:'%c results (used &lt; %t%)'
+ }
+};
+let LANG=localStorage.lang||'de';
+const t=k=>(I18N[LANG] && I18N[LANG][k]!==undefined)?I18N[LANG][k]:k;
+const RERUN={};
+function applyLang(){
+  document.documentElement.lang=LANG;
+  document.title=t('title');
+  document.querySelectorAll('[data-i18n]').forEach(e=>e.innerHTML=t(e.dataset.i18n));
+  document.querySelectorAll('[data-i18n-ph]').forEach(e=>e.placeholder=t(e.dataset.i18nPh));
+  document.querySelectorAll('.lang').forEach(b=>b.classList.toggle('on',b.dataset.l===LANG));
+  engStatus();
+  Object.values(RERUN).forEach(f=>{try{f();}catch(e){}});
+}
+function setLang(l){LANG=l;localStorage.lang=l;applyLang();}
+
+function checkpw(){ if(document.getElementById('pw').value===PW){sessionStorage.kb='1';document.getElementById('gate').style.display='none';} else {document.getElementById('pwerr').textContent=t('pw_wrong');} }
 if(sessionStorage.kb==='1') document.getElementById('gate').style.display='none';
 document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')checkpw();});
 
@@ -91,60 +178,63 @@ async function api(path){
 }
 const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function table(rows,cols){
-  if(!rows.length) return '<p class="muted">Keine Treffer.</p>';
+  if(!rows.length) return '<p class="muted">'+t('no_hits')+'</p>';
   return '<table><thead><tr>'+cols.map(c=>'<th>'+c.h+'</th>').join('')+'</tr></thead><tbody>'+
     rows.map(r=>'<tr>'+cols.map(c=>'<td>'+(c.f?c.f(r[c.k],r):esc(r[c.k]))+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
 }
 const utilCls=v=>v<40?'bad':v<60?'warn':'ok';
-async function run(id,fn){const el=document.getElementById(id);el.innerHTML='<span class="muted">lädt…</span>';try{el.innerHTML=await fn();}catch(e){el.innerHTML='<span class="bad">Fehler: '+esc(e.message).slice(0,200)+'</span>';}}
+async function run(id,fn){const el=document.getElementById(id);el.innerHTML='<span class="muted">'+t('loading')+'</span>';try{el.innerHTML=await fn();}catch(e){el.innerHTML='<span class="bad">'+t('error')+esc(e.message).slice(0,200)+'</span>';}}
 
-function qA(){run('outA',async()=>{
+function qA(){RERUN.outA=qA;run('outA',async()=>{
   const d=await api("v_utilisation?month=eq.2026-04&order=care_util.asc&limit=12&select=nurse,date,care_min,travel_min,care_util");
-  return table(d,[{k:'nurse',h:'Pflegekraft'},{k:'date',h:'Datum'},
-    {k:'care_min',h:'Pflege min'},{k:'travel_min',h:'Fahrt/Leerlauf min'},
-    {k:'care_util',h:'Pflege-Auslastung',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+  return table(d,[{k:'nurse',h:t('h_nurse')},{k:'date',h:t('h_date')},
+    {k:'care_min',h:t('h_caremin')},{k:'travel_min',h:t('h_travelmin_full')},
+    {k:'care_util',h:t('h_careutil'),f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
 });}
-function qB(){const n=document.getElementById('nurse').value.trim()||'Blank';run('outB',async()=>{
+function qB(){const n=document.getElementById('nurse').value.trim()||'Blank';RERUN.outB=qB;run('outB',async()=>{
   const d=await api("v_utilisation?month=eq.2026-04&nurse=ilike.*"+encodeURIComponent(n)+"*&order=date.asc&select=date,nurse,care_min,travel_min,care_util");
-  if(!d.length) return '<p class="muted">Keine Treffer für "'+esc(n)+'".</p>';
+  if(!d.length) return '<p class="muted">'+t('no_hits_for').replace('%s',esc(n))+'</p>';
   const avg=(d.reduce((s,r)=>s+(+r.care_util||0),0)/d.length).toFixed(1);
-  return '<div><span class="kpi">'+esc(d[0].nurse)+'</span><span class="kpi">Ø Pflege-Auslastung '+avg+'%</span><span class="kpi">'+d.length+' Touren</span></div>'+
-    table(d,[{k:'date',h:'Datum'},{k:'care_min',h:'Pflege min'},{k:'travel_min',h:'Fahrt/Leerlauf'},
-      {k:'care_util',h:'Auslastung',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+  return '<div><span class="kpi">'+esc(d[0].nurse)+'</span><span class="kpi">'+t('kpi_avg').replace('%s',avg)+'</span><span class="kpi">'+t('kpi_tours').replace('%s',d.length)+'</span></div>'+
+    table(d,[{k:'date',h:t('h_date')},{k:'care_min',h:t('h_caremin')},{k:'travel_min',h:t('h_travelmin')},
+      {k:'care_util',h:t('h_util'),f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
 });}
-function qC(){const n=document.getElementById('pat').value.trim()||'Joppien';run('outC',async()=>{
+function qC(){const n=document.getElementById('pat').value.trim()||'Joppien';RERUN.outC=qC;run('outC',async()=>{
   const d=await api("v_budget_utilisation?full_name=ilike.*"+encodeURIComponent(n)+"*&order=paragraph.asc");
-  if(!d.length) return '<p class="muted">Keine Treffer für "'+esc(n)+'".</p>';
+  if(!d.length) return '<p class="muted">'+t('no_hits_for').replace('%s',esc(n))+'</p>';
   return '<div class="kpi">'+esc(d[0].full_name)+'</div>'+
-    table(d,[{k:'paragraph',h:'§',f:v=>'§'+v},{k:'budget_eur',h:'Budget €'},{k:'used_eur',h:'verbraucht €'},
-      {k:'remaining_eur',h:'verfügbar €'},{k:'util_pct',h:'genutzt',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+    table(d,[{k:'paragraph',h:'§',f:v=>'§'+v},{k:'budget_eur',h:t('h_budget')},{k:'used_eur',h:t('h_used')},
+      {k:'remaining_eur',h:t('h_remaining')},{k:'util_pct',h:t('h_usedpct'),f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
 });}
+function qD(){const th=+document.getElementById('thr').value||20;RERUN.outD=qD;run('outD',async()=>{
+  const d=await api("v_budget_utilisation?util_pct=lt."+th+"&order=remaining_eur.desc&limit=40");
+  return '<p class="muted">'+t('qd_count').replace('%c',d.length).replace('%t',th)+'</p>'+
+    table(d,[{k:'full_name',h:t('h_patient')},{k:'paragraph',h:'§',f:v=>'§'+v},
+      {k:'remaining_eur',h:t('h_unused')},{k:'util_pct',h:t('h_usedpct'),f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
+});}
+
 async function engStatus(){
   try{const r=await fetch('/engine');const d=await r.json();
     const el=document.getElementById('engst');
-    el.textContent = d.has_key?'🟢 API aktiv':d.live?'🟢 Live-Engine verbunden':'⚪ Engine offline';
+    el.textContent = d.has_key?t('eng_api'):d.live?t('eng_live'):t('eng_off');
     el.style.color = (d.has_key||d.live)?'#1a7f37':'#6b7280';
   }catch(e){}
 }
-engStatus(); setInterval(engStatus,5000);
 async function ask(){
   const q=document.getElementById('askq').value.trim(); if(!q)return;
-  const el=document.getElementById('askout'); el.innerHTML='<span class="muted">denke nach…</span>';
+  const el=document.getElementById('askout'); el.innerHTML='<span class="muted">'+t('thinking')+'</span>';
   try{
     const r=await fetch('/ask',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question:q})});
     const d=await r.json();
     if(d.error){ el.innerHTML='<span class="bad">'+esc(d.error)+'</span>'+(d.sql?'<div class="muted" style="margin-top:6px"><code>'+esc(d.sql)+'</code></div>':''); return; }
     const cols=d.columns||[];
     el.innerHTML=(d.rows.length?'<table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+
-      d.rows.map(row=>'<tr>'+cols.map(c=>'<td>'+esc(row[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table>':'<p class="muted">Keine Treffer.</p>')+
+      d.rows.map(row=>'<tr>'+cols.map(c=>'<td>'+esc(row[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table>':'<p class="muted">'+t('no_hits')+'</p>')+
       '<div class="muted" style="margin-top:6px">SQL: <code>'+esc(d.sql)+'</code></div>';
-  }catch(e){ el.innerHTML='<span class="bad">Fehler: '+esc(e.message)+'</span>'; }
+  }catch(e){ el.innerHTML='<span class="bad">'+t('error')+esc(e.message)+'</span>'; }
 }
-function qD(){const t=+document.getElementById('thr').value||20;run('outD',async()=>{
-  const d=await api("v_budget_utilisation?util_pct=lt."+t+"&order=remaining_eur.desc&limit=40");
-  return '<p class="muted">'+d.length+' Treffer (genutzt &lt; '+t+'%)</p>'+
-    table(d,[{k:'full_name',h:'Patient'},{k:'paragraph',h:'§',f:v=>'§'+v},
-      {k:'remaining_eur',h:'ungenutzt €'},{k:'util_pct',h:'genutzt',f:v=>'<span class="'+utilCls(v)+'">'+v+'%</span>'}]);
-});}
+
+applyLang();
+setInterval(engStatus,5000);
 </script>
 </body></html>

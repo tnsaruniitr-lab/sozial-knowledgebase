@@ -237,7 +237,8 @@ def emit_csv(tours, out_path):
     coords = load_coords()
     cols = ["tourId", "nurseName", "visitSequence", "visitId", "patientName",
             "patientAddress", "latitude", "longitude", "shiftStart", "shiftEnd",
-            "visitTime", "visitDurationMin", "travelTimeMin", "dateOfService", "codes",
+            "visitTime", "visitDurationMin", "travelTimeMin", "serviceTimeMin",
+            "waitingTimeMin", "dateOfService", "codes",
             "travelToVisitMin", "plannedTime", "plannedDurationMin",
             "plannedTravelMin", "notes", "wg"]
     n_rows = n_coord = 0
@@ -254,6 +255,18 @@ def emit_csv(tours, out_path):
             shift_start = t["prep_start"] or (starts[0] if starts else "")
             shift_end = ends[-1] if ends else ""
             total_travel = sum(hhmm_min(v.a["fz"]) or 0 for v in vs if v.a.get("fz"))
+            total_service = sum(hhmm_min(v.a["dur"]) or 0 for v in vs if v.a.get("dur"))
+            # real recorded idle: gap between (prev end + drive) and next start,
+            # over consecutive visit pairs that both have clock times.
+            total_wait = 0
+            for prev, nxt in zip(vs, vs[1:]):
+                pe, nb = hhmm_min(prev.a.get("end") or ""), hhmm_min(nxt.a.get("beg") or "")
+                if pe is None or nb is None:
+                    continue
+                drive = hhmm_min(nxt.a.get("fz") or "") or 0
+                gap = nb - (pe + drive)
+                if 0 < gap < 180:          # ignore negatives and shift breaks
+                    total_wait += gap
             for i, v in enumerate(vs, 1):
                 name, addr, phone, wg = v.patient_and_address()
                 lat = lng = ""
@@ -270,7 +283,8 @@ def emit_csv(tours, out_path):
                     "shiftStart": shift_start, "shiftEnd": shift_end,
                     "visitTime": v.a.get("beg") or v.p.get("beg") or "",
                     "visitDurationMin": a_dur if a_dur is not None else (p_dur or 0),
-                    "travelTimeMin": total_travel, "dateOfService": t["date"],
+                    "travelTimeMin": total_travel, "serviceTimeMin": total_service,
+                    "waitingTimeMin": total_wait, "dateOfService": t["date"],
                     "codes": ";".join(v.codes),
                     "travelToVisitMin": hhmm_min(v.a["fz"]) if v.a.get("fz") else "",
                     "plannedTime": v.p.get("beg") or "",

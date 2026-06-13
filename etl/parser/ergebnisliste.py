@@ -172,7 +172,8 @@ def parse_pdf(path):
                       "Nachbereitung", "Verwaltungstätigkeit", "Verwaltungstaetigkeit",
                       "Fortbildung", "Tanken", "Autowäsche", "Pflegedoku",
                       "Telefonat", "Wohngemeinschaft", "Dienstbesprechung",
-                      "Rufbereitschaft", "Dienstende", "Hauswirtschaftliche Tätigkeit")
+                      "Rufbereitschaft", "Dienstende", "Hauswirtschaftliche Tätigkeit",
+                      "Fallbesprechung", "Pflegebeobachtung")
             if main_txt.startswith("_") or any(main_txt.startswith(p) for p in PSEUDO):
                 if main_txt.startswith("Vorbereitung") and f["beg"]:
                     cur["prep_start"] = f["beg"]
@@ -219,6 +220,55 @@ def parse_pdf(path):
     return tours
 
 
+WG_MARKERS = ("FD EX", "SD EX", "ND EX", "EX Mittag", "EX ND")
+
+
+def is_wg_ident(idn):
+    return idn.startswith("WG") or any(m in idn for m in WG_MARKERS)
+
+
+def collapse_wg(visits):
+    """A WG (shared-housing) block is printed as an umbrella header
+    (e.g. 'WG WHD SD EX', dur = the whole block) followed by its residents
+    (real patients at the WG address, duration-only, no individual clock).
+    The header duration EXACTLY equals the sum of the residents, so counting
+    both double-counts care. Resolution: drop the header as a care visit, move
+    its drive-in leg (fz) + arrival onto the first resident, and keep the
+    residents (they have addresses → they map; flagged is_wg_resident). A WG
+    header with no residents is kept as a single block visit."""
+    out = []
+    i = 0
+    while i < len(visits):
+        v = visits[i]
+        if is_wg_ident(v.identity()):
+            j = i + 1
+            res = []
+            while j < len(visits):
+                w = visits[j]
+                if is_wg_ident(w.identity()) or w.a.get("beg"):
+                    break
+                res.append(w)
+                j += 1
+            if res:
+                if v.a.get("fz") and not res[0].a.get("fz"):
+                    res[0].a["fz"] = v.a["fz"]      # preserve drive-into-WG leg
+                for w in res:
+                    w.is_wg_resident = True
+                    # block arrival for ordering — kept on a side attr so the
+                    # resident stays clock-less and collapse_wg is idempotent.
+                    w.wg_block_time = v.a.get("beg")
+                out.extend(res)
+                i = j
+            else:
+                v.is_wg_block = True
+                out.append(v)
+                i += 1
+        else:
+            out.append(v)
+            i += 1
+    return out
+
+
 def load_coords():
     """patient name (norm) -> (lat,lng,patient_id) from the KB, via aliases."""
     url = os.environ.get("DATABASE_URL")
@@ -256,7 +306,7 @@ def emit_csv(tours, out_path):
         w = csv.DictWriter(fh, fieldnames=cols)
         w.writeheader()
         for t in tours:
-            vs = t["visits"]
+            vs = collapse_wg(t["visits"])
             if not vs:
                 continue
             tid = f"actual_{t['date']}_{slug(t['label'])}"
@@ -279,6 +329,7 @@ def emit_csv(tours, out_path):
                     total_wait += gap
             for i, v in enumerate(vs, 1):
                 name, addr, phone, wg = v.patient_and_address()
+                wg = wg or getattr(v, "is_wg_resident", False) or getattr(v, "is_wg_block", False)
                 lat = lng = ""
                 hit = coords.get(norm(name))
                 if hit and hit[0] is not None:
@@ -291,7 +342,7 @@ def emit_csv(tours, out_path):
                     "visitId": f"{tid}_v{i}", "patientName": name,
                     "patientAddress": addr, "latitude": lat, "longitude": lng,
                     "shiftStart": shift_start, "shiftEnd": shift_end,
-                    "visitTime": v.a.get("beg") or v.p.get("beg") or "",
+                    "visitTime": v.a.get("beg") or v.p.get("beg") or getattr(v, "wg_block_time", "") or "",
                     "visitDurationMin": a_dur if a_dur is not None else (p_dur or 0),
                     "travelTimeMin": total_travel, "serviceTimeMin": total_service,
                     "waitingTimeMin": total_wait, "dateOfService": t["date"],
@@ -319,7 +370,7 @@ def main():
         all_tours.extend(ts)
         print(f"\n=== {os.path.basename(p)} → {len(ts)} tours ===")
         for t in ts:
-            vs = t["visits"]
+            vs = collapse_wg(t["visits"])
             care = sum(hhmm_min(v.a["dur"]) or 0 for v in vs if v.a.get("dur"))
             legs = sum(hhmm_min(v.a["fz"]) or 0 for v in vs if v.a.get("fz"))
             miss_t = sum(1 for v in vs if not v.a.get("beg"))

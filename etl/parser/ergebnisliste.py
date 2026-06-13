@@ -21,6 +21,10 @@ X_FZ, X_BEG, X_END, X_DUR, X_NOTE = 62, 99, 135, 168, 438
 TIME_RE = re.compile(r"^\d{1,2}:\d{2}$")
 TOUR_RE = re.compile(r"Tour: (.+?) am \w+, (\d\d)\.(\d\d)\.(\d\d)$")
 CODE_RE = re.compile(r"^([PKH]\d+\w*)\b(.*)$")
+# Checkbox glyphs: þ = performed, ¨ / ü = not performed / alternative. A main
+# cell starting with any of these is a service-code line, never a patient name.
+BOX_GLYPHS = ("þ", "¨", "ü")
+BOX_SPLIT = re.compile(r"\s*[þ¨ü]\s*")
 PHONE_RE = re.compile(r"^0?1?[\d\s/-]{6,}$")
 PID_RE = re.compile(r"^\[/(\d+)\]$")
 
@@ -161,24 +165,30 @@ def parse_pdf(path):
             timerow = any(f[k] for k in ("fz", "beg", "end", "dur"))
             main_txt = " ".join(t for _, t in f["main"]).strip()
 
-            # pseudo-blocks (prep, logbook, admin time): consume their actual
-            # row now and their planned row next — they are not patient visits.
+            # pseudo-blocks (prep, logbook, admin/non-care time): consume their
+            # actual row now and their planned row next — not patient visits.
             PSEUDO = ("Vorbereitung", "Fahrtenbuch", "Koordinationszeit",
-                      "Pause", "Übergabe", "Besprechung", "Teamsitzung", "Büro")
-            if any(main_txt.startswith(p) for p in PSEUDO):
+                      "Pause", "Übergabe", "Besprechung", "Teamsitzung", "Büro",
+                      "Nachbereitung", "Verwaltungstätigkeit", "Verwaltungstaetigkeit",
+                      "Fortbildung", "Tanken", "Autowäsche", "Pflegedoku",
+                      "Telefonat", "Wohngemeinschaft", "Dienstbesprechung",
+                      "Rufbereitschaft", "Dienstende", "Hauswirtschaftliche Tätigkeit")
+            if main_txt.startswith("_") or any(main_txt.startswith(p) for p in PSEUDO):
                 if main_txt.startswith("Vorbereitung") and f["beg"]:
                     cur["prep_start"] = f["beg"]
                 close_visit()
                 skip_next_timerow = True
                 continue
 
-            is_code = bool(f["main"]) and f["main"][0][1] == "þ"
+            is_code = bool(f["main"]) and f["main"][0][1] in BOX_GLYPHS
             if is_code and visit:
-                # one line can hold two 'þ CODE label' groups
-                segs = re.split(r"\s*þ\s*", main_txt)
-                for s in segs:
+                # one line can hold several '<box> CODE label' groups
+                for s in BOX_SPLIT.split(main_txt):
                     s = s.strip()
                     if not s:
+                        continue
+                    if "nicht angetroffen" in s.lower():
+                        visit.notes.append("Patient nicht angetroffen")
                         continue
                     cm = CODE_RE.match(s)
                     if cm:

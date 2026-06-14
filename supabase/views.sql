@@ -143,3 +143,57 @@ from (
   where p.sachleistung_eligible
   order by p.patient_id, sp.month desc nulls last
 ) x;
+
+-- ===================== Financial layer: estimated vs settled =====================
+-- Billing in Pflege lags delivery by weeks, so recent months (e.g. June) have NO
+-- invoices yet. Model revenue in two layers and calibrate the estimate against the
+-- one month (April) that has BOTH, so unbilled months get a confidence-banded
+-- projection until their bill.xls arrives. Each month carries a status flag.
+
+-- 1) ESTIMATED — code-derived, available the day after the tours run.
+create or replace view v_revenue_estimated as
+select v.patient_id,
+       to_char(v.date,'YYYY-MM') as month,
+       round(coalesce(sum(vs.quantity*lk.euro_per_unit) filter (where lk.sgb='XI'),0),2) as est_xi_eur,
+       round(coalesce(sum(vs.quantity*lk.euro_per_unit) filter (where lk.sgb='V'),0),2)  as est_v_eur,
+       round(coalesce(sum(vs.quantity*lk.euro_per_unit),0),2) as est_total_eur
+from visits v
+join visit_services vs using (visit_id)
+join lk_codes lk on lk.code=vs.code
+where lk.euro_per_unit is not null
+group by v.patient_id, to_char(v.date,'YYYY-MM');
+
+-- 2) SETTLED — actual invoiced euros (bill.xls); only months already billed.
+create or replace view v_revenue_settled as
+select patient_id, service_month as month, round(sum(amount_eur),2) as billed_eur
+from invoices group by patient_id, service_month;
+
+-- 3) MONTH roll-up: estimated vs settled totals, status, and calibration factor.
+create or replace view v_month_financials as
+with est as (select month, sum(est_total_eur) e from v_revenue_estimated group by month),
+     bil as (select month, sum(billed_eur) b from v_revenue_settled group by month)
+select coalesce(est.month,bil.month) as month,
+       case when bil.b is not null then 'settled' else 'estimated' end as status,
+       round(est.e,0) as estimated_eur,
+       round(bil.b,0) as billed_eur,
+       case when bil.b is not null and est.e>0 then round(bil.b/est.e,3) end as calibration_factor
+from est full join bil using (month);
+
+-- 4) RECONCILIATION — per patient where both exist (estimate vs actual + variance).
+create or replace view v_revenue_reconciliation as
+select e.patient_id, p.full_name, e.month,
+       e.est_total_eur, s.billed_eur,
+       round(s.billed_eur-e.est_total_eur,2) as variance_eur,
+       round(100.0*(s.billed_eur-e.est_total_eur)/nullif(e.est_total_eur,0),1) as variance_pct
+from v_revenue_estimated e
+join v_revenue_settled s using (patient_id, month)
+join patients p using (patient_id);
+
+-- 5) PROJECTED — for unbilled months: estimate x the settled-month calibration.
+create or replace view v_revenue_projected as
+select e.patient_id, p.full_name, e.month, mf.status, e.est_total_eur,
+       round(e.est_total_eur * coalesce(
+         (select avg(calibration_factor) from v_month_financials where status='settled'),1),2) as projected_eur
+from v_revenue_estimated e
+join patients p using (patient_id)
+join v_month_financials mf using (month);
